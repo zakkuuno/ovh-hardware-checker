@@ -2,6 +2,10 @@
 
 A front-end only, in-browser terminal for checking OVH server hardware specifications. All API keys and history are stored locally in your browser's localStorage.
 
+### **Live Demo**
+
+[**You can try it live here\!**](https://zakkuuno.github.io/ovh-hardware-checker/)
+
 ### **Features**
 
 * **Secure & Private:** All API keys are stored *only* in your browser's local storage. They are never sent to any server except the OVH API.  
@@ -23,7 +27,7 @@ This tool stores your API keys, including your **Application Secret** and **Cons
 
 * **DO NOT** use this on a public or shared computer.  
 * **DO NOT** enter your keys if you are on an untrusted network.  
-* I am not responsible for any misuse or loss of credentials.
+* I am **NOT** responsible for any misuse or loss of credentials.
 
 ### **License**
 
