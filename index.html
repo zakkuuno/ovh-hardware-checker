@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OVH Hardware Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Fira Code', monospace;
+            background-color: #111827; 
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .cursor {
+            display: none;
+            width: 10px;
+            height: 1.2em;
+            background: #34d399; 
+            display: inline-block;
+            margin-left: 5px;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        #terminal-input {
+            font-family: 'Fira Code', monospace;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #d1d5db; 
+            width: 100%;
+            caret-color: #9ca3af; 
+        }
+
+        .terminal-line {
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #d1d5db; 
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .text-success { color: #34d399; } 
+        .text-error   { color: #f87171; } 
+        .text-warn    { color: #facc15; } 
+        .text-info    { color: #60a5fa; } 
+        .text-muted   { color: #9ca3af; } 
+    </style>
+</head>
+<body class="h-full bg-gray-900 text-gray-300 flex items-center justify-center p-4">
+
+    <div class="flex flex-col lg:flex-row w-full max-w-6xl h-[90vh] lg:h-[80vh] space-y-4 lg:space-y-0 lg:space-x-4">
+        
+        <div class="w-full lg:w-64 h-48 lg:h-full bg-[#0d1117] border border-gray-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            <div class="bg-gray-800 border-b border-gray-700 p-3">
+                <h3 class="text-center text-sm text-gray-400 font-medium">Server History</h3>
+            </div>
+            <div id="server-history-list" class="flex-1 p-2 overflow-y-auto scroll-smooth space-y-1">
+            </div>
+        </div>
+
+        <div class="flex-1 bg-[#0d1117] border border-gray-700 rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            <div class="bg-gray-800 border-b border-gray-700 p-3 flex items-center space-x-2">
+            <span class="flex-1 text-center text-sm text-gray-400 font-medium">OVH Hardware Specs</span>
+            <button id="config-button" class="text-gray-400 hover:text-white" title="Open Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978.988.24 1.487 1.379.947 2.286-.836 1.372.734 2.942 2.106 2.106.886-.54 2.042.061 2.287.947.379 1.561 2.6 1.561 2.978 0 .24-.988 1.379-1.487 2.286-.947 1.372.836 2.942-.734 2.106-2.106-.54-.886-.061-2.042.947-2.287 1.561-.379 1.561-2.6 0-2.978-.988-.24-1.487-1.379-.947-2.286.836-1.372-.734-2.942-2.106-2.106-.886.54-2.042-.061-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+
+        <div id="terminal-output" class="flex-1 p-4 overflow-y-auto scroll-smooth">
+        </div>
+
+        <div class="border-t border-gray-700 p-3 bg-gray-800/50">
+            <div class="flex items-center">
+                <span class="text-error mr-2">$</span>
+                <form id="terminal-form" class="flex-1">
+                    <input type="text" id="terminal-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                </form>
+            </div>
+        </div>
+    </div>
+    
+
+    </div> 
+
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div class="p-6 border-b border-gray-700">
+                <h2 class="text-xl font-semibold text-white">API Settings</h2>
+            </div>
+            <form id="settings-form" class="p-6 space-y-4 overflow-y-auto">
+                <div class="bg-red-900/50 border border-red-700 text-red-300 p-4 rounded-lg">
+                    <strong class="font-bold">SECURITY WARNING!</strong>
+                    <p class="text-sm">Never enter your API secrets on a website you don't trust. These keys are stored *only* in your browser's local storage. They are not sent anywhere except directly to the OVH API. This tool is generated by AI and is for temporary diagnostics.</p>
+                    <strong class="font-bold">USE AT YOUR OWN RISK!</strong>
+                </div>
+
+                <div>
+                    <label for="endpoint" class="block text-sm font-medium text-gray-400">Endpoint</label>
+                    <select id="endpoint" name="endpoint" class="mt-1 block w-full bg-gray-800 border-gray-700 text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                        <option value="ovh-eu">ovh-eu (https://api.ovh.com/1.0)</option>
+                        <option value="ovh-us">ovh-us (https://api.ovh.us/1.0)</option>
+                        <option value="ovh-ca">ovh-ca (https://ca.api.ovh.com/1.0)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="app-key" class="block text-sm font-medium text-gray-400">Application Key</label>
+                    <input type="text" name="app-key" id="app-key" class="mt-1 block w-full bg-gray-800 border-gray-700 text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                </div>
+                
+                <div>
+                    <label for="app-secret" class="block text-sm font-medium text-gray-400">Application Secret</label>
+                    <input type="password" name="app-secret" id="app-secret" class="mt-1 block w-full bg-gray-800 border-gray-700 text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                </div>
+
+                <div>
+                    <label for="consumer-key" class="block text-sm font-medium text-gray-400">Consumer Key</label>
+                    <input type="password" name="consumer-key" id="consumer-key" class="mt-1 block w-full bg-gray-800 border-gray-700 text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                    <p class="mt-1 text-xs text-gray-500">Get this from <a href="https://api.ovh.com/createToken/" target="_blank" class="text-blue-400 underline">api.ovh.com/createToken</a></p>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md shadow">Save & Close</button>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 mt-4 space-y-4">
+                    <div>
+                        <label for="cmd-history-limit" class="block text-sm font-medium text-gray-400">Command History Limit</label>
+                        <input type="number" name="cmd-history-limit" id="cmd-history-limit" class="mt-1 block w-full bg-gray-800 border-gray-700 text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2.5" min="1" max="1000">
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <button type="button" id="clear-cmd-history-btn" class="w-full text-sm bg-yellow-700 hover:bg-yellow-800 text-white font-medium py-2 px-4 rounded-md shadow">Clear Cmd History</button>
+                        <button type="button" id="clear-server-history-btn" class="w-full text-sm bg-red-700 hover:bg-red-800 text-white font-medium py-2 px-4 rounded-md shadow">Clear Server History</button>
+                    </div>
+                    <div class="border-t border-gray-800 pt-4 mt-4">
+                         <button type="button" id="clear-all-storage-btn" class="w-full text-sm bg-red-900 hover:bg-red-800 border border-red-700 text-red-300 font-bold py-2 px-4 rounded-md shadow">Clear ALL Storage (This is permanent)</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        const terminalOutput = document.getElementById('terminal-output');
+        const terminalForm = document.getElementById('terminal-form');
+        const terminalInput = document.getElementById('terminal-input');
+        const settingsModal = document.getElementById('settings-modal');
+        const settingsForm = document.getElementById('settings-form');
+        const configButton = document.getElementById('config-button');
+        
+        const serverHistoryList = document.getElementById('server-history-list');
+
+        const clearCmdHistoryBtn = document.getElementById('clear-cmd-history-btn');
+        const clearServerHistoryBtn = document.getElementById('clear-server-history-btn');
+        const clearAllStorageBtn = document.getElementById('clear-all-storage-btn');
+        
+        let commandHistory = []; 
+        let historyIndex = -1;
+        const CONFIG_KEY = 'ovh-api-config';
+        
+        const SERVER_HISTORY_KEY = 'ovh-server-history';
+        let serverHistory = [];
+
+        const CMD_HISTORY_KEY = 'ovh-cmd-history';
+        const CMD_HISTORY_LIMIT_KEY = 'ovh-cmd-history-limit';
+        let cmdHistoryLimit = 50;
+        
+        const ENDPOINT_URLS = {
+            'ovh-eu': 'https://eu.api.ovh.com/1.0',
+            'ovh-us': 'https://api.ovh.us/1.0',
+            'ovh-ca': 'https://ca.api.ovh.com/1.0',
+        };
+
+        const get = (obj, path, _default = 'N/A') => {
+            const value = path.split('.').reduce((acc, key) => (acc && acc[key] ? acc[key] : undefined), obj);
+            return value !== undefined ? value : _default;
+        };
+        
+        function printToTerminal(html) {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = html;
+            terminalOutput.appendChild(line);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function printLinesAnimated(lines, delay = 30) {
+            let index = 0;
+            function printLine() {
+                if (index < lines.length) {
+                    printToTerminal(lines[index]);
+                    index++;
+                    setTimeout(printLine, delay);
+                } else {
+                    terminalInput.focus();
+                }
+            }
+            printLine();
+        }
+
+        function clearTerminal() {
+            terminalOutput.innerHTML = '';
+        }
+
+        function openSettings() {
+            const config = getConfig();
+            if (config) {
+                settingsForm.elements['endpoint'].value = config.endpoint;
+                settingsForm.elements['app-key'].value = config.appKey;
+                settingsForm.elements['app-secret'].value = config.appSecret;
+                settingsForm.elements['consumer-key'].value = config.consumerKey;
+                settingsForm.elements['cmd-history-limit'].value = cmdHistoryLimit;
+            }
+            settingsModal.classList.remove('hidden');
+            terminalInput.disabled = true;
+        }
+
+        function closeSettings() {
+            settingsModal.classList.add('hidden');
+            terminalInput.disabled = false;
+            terminalInput.focus();
+        }
+
+        function getConfig() {
+            const storedConfig = localStorage.getItem(CONFIG_KEY);
+            return storedConfig ? JSON.parse(storedConfig) : null;
+        }
+
+        function saveConfig(config) {
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        }
+        
+        function renderServerHistory() {
+            serverHistoryList.innerHTML = '';
+            
+            if (serverHistory.length === 0) {
+                serverHistoryList.innerHTML = `<span class="p-2 text-xs text-gray-500 italic">No servers checked yet.</span>`;
+                return;
+            }
+
+            serverHistory.forEach(item => {
+                const infoButton = document.createElement('button');
+                infoButton.className = 'w-full text-left p-2 rounded-md bg-gray-800 hover:bg-gray-700 transition-colors duration-150 block';
+                infoButton.setAttribute('data-server-id', item.id);
+                
+                const displayName = item.friendlyName || item.id;
+                const summaryText = item.summary.length > 30 ? item.summary.substring(0, 27) + '...' : item.summary;
+                
+                infoButton.innerHTML = `
+                    <span class="block text-sm font-medium text-blue-400 hover:text-blue-300 truncate" title="${displayName}">${displayName}</span>
+                    <span class="block text-xs text-gray-500 truncate" title="${item.summary}">${summaryText}</span>
+                `;
+                
+                infoButton.addEventListener('click', () => {
+                    const server = serverHistory.find(s => s.id === item.id);
+                    if (server) {
+                        const historyName = server.friendlyName ? `${server.friendlyName} [${server.id}]` : server.id;
+                        printToTerminal(`<span class="text-muted"><span class="text-error">$</span> check ${historyName} (from history)</span>`);
+                        const reportLines = formatReport(server.config, true); 
+                        printLinesAnimated(reportLines, 20); 
+                    }
+                });
+                
+                serverHistoryList.appendChild(infoButton); 
+            });
+        }
+
+        function addServerToHistory(serverId, config) {
+            const cpuModel = get(config, 'processorName', '?');
+            const memInfo = get(config, 'memorySize', null);
+            let ram = '?GB';
+            if (memInfo && typeof memInfo === 'object') {
+                const value = get(memInfo, 'value');
+                const unit = get(memInfo, 'unit', '');
+                let gbValue = 0;
+                if (unit.toUpperCase() === 'MB' && value !== 'N/A') {
+                    gbValue = value / 1024;
+                } else if (unit.toUpperCase() === 'GB' && value !== 'N/A') {
+                    gbValue = value;
+                }
+                ram = `${gbValue.toFixed(0)}GB`;
+            }
+            const summary = `${cpuModel} (${ram})`;
+
+            const existingEntry = serverHistory.find(item => item.id === serverId);
+            const friendlyName = existingEntry ? existingEntry.friendlyName : undefined;
+
+            serverHistory = serverHistory.filter(item => item.id !== serverId);
+            
+            serverHistory.unshift({
+                id: serverId,
+                friendlyName: friendlyName, 
+                summary: summary, 
+                config: config 
+            });
+
+            localStorage.setItem(SERVER_HISTORY_KEY, JSON.stringify(serverHistory));
+            
+            renderServerHistory();
+        }
+
+        function clearServerHistory() {
+            serverHistory = [];
+            localStorage.removeItem(SERVER_HISTORY_KEY);
+            renderServerHistory();
+            printToTerminal(`<span class="text-success">Server history cleared.</span>`);
+            closeSettings();
+        }
+
+        function deleteServerFromHistory(serverId, fromCommand = false) {
+            const serverExists = serverHistory.some(item => item.id === serverId);
+            if (!serverExists) {
+                if (fromCommand) {
+                    printToTerminal(`<span class="text-error">Server not in history: ${serverId}</span>`);
+                }
+                return; 
+            }
+
+            serverHistory = serverHistory.filter(item => item.id !== serverId);
+            localStorage.setItem(SERVER_HISTORY_KEY, JSON.stringify(serverHistory));
+            renderServerHistory(); 
+
+            if (fromCommand) {
+                printToTerminal(`<span class="text-success">Removed '${serverId}' from history.</span>`);
+            }
+        }
+
+        function saveCommandHistory() {
+            const toSave = commandHistory.slice(-cmdHistoryLimit);
+            localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(toSave));
+            commandHistory = toSave; 
+            historyIndex = commandHistory.length; 
+        }
+
+        function clearCommandHistory() {
+            commandHistory = [];
+            historyIndex = 0;
+            localStorage.removeItem(CMD_HISTORY_KEY);
+            printToTerminal(`<span class="text-success">Command history cleared.</span>`);
+            closeSettings();
+        }
+
+        function clearAllStorage() {
+            localStorage.removeItem(CONFIG_KEY);
+            localStorage.removeItem(SERVER_HISTORY_KEY);
+            localStorage.removeItem(CMD_HISTORY_KEY);
+            localStorage.removeItem(CMD_HISTORY_LIMIT_KEY);
+
+            serverHistory = [];
+            commandHistory = [];
+            historyIndex = 0;
+            cmdHistoryLimit = 50; 
+
+            renderServerHistory();
+            
+            try {
+                settingsForm.elements['cmd-history-limit'].value = cmdHistoryLimit;
+            } catch (e) { }
+
+            printToTerminal(`<span class="text-success">All stored data has been cleared.</span>`);
+            printToTerminal(`<span class="text-warn">API credentials have been cleared. Please re-enter them in settings.</span>`);
+            closeSettings();
+            openSettings(); 
+        }
+
+        async function sha1(str) {
+            const textBuffer = new TextEncoder().encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-1', textBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hexHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hexHash;
+        }
+        
+        function formatReport(config, isCached = false) {
+            const lines = [];
+            
+            const mainBranch = (title) => `├─ <span class="text-success">${title}</span>`;
+            const lastMainBranch = (title) => `└─ <span class="text-success">${title}</span>`;
+            
+            const subItem = (label, value) => `│  ├─ <span class="text-info">${label}:</span> <span class="text-muted">${value}</span>`;
+            const lastSubItem = (label, value) => `│  └─ <span class="text-info">${label}:</span> <span class="text-muted">${value}</span>`;
+
+            const finalSubItem = (label, value) => `   ├─ <span class="text-info">${label}:</span> <span class="text-muted">${value}</span>`;
+            const finalLastSubItem = (label, value) => `   └─ <span class="text-info">${label}:</span> <span class="text-muted">${value}</span>`;
+
+            const description = get(config, 'description', 'Unknown Server');
+            const cpuModel = get(config, 'processorName', '?');
+            const cpuCount = get(config, 'numberOfProcessors', '1');
+            const cores = get(config, 'coresPerProcessor', '?');
+            const threads = get(config, 'threadsPerProcessor', '?');
+            const memInfo = get(config, 'memorySize', null);
+            const diskGroups = get(config, 'diskGroups', []);
+
+            let ram = 'N/A';
+            let ramRaw = 'N/A';
+            if (memInfo && typeof memInfo === 'object') {
+                const value = get(memInfo, 'value');
+                const unit = get(memInfo, 'unit', '');
+                ramRaw = `${value} ${unit}`;
+                let gbValue = 0;
+                if (unit.toUpperCase() === 'MB' && value !== 'N/A') {
+                    gbValue = value / 1024;
+                } else if (unit.toUpperCase() === 'GB' && value !== 'N/A') {
+                    gbValue = value;
+                }
+                ram = `${gbValue.toFixed(0)} GB`;
+            }
+
+            const status = isCached ? '(Cached)' : '(Live)';
+            lines.push(`<span class="text-white font-bold">${description}</span> <span class="text-muted">${status}</span>`);
+
+            lines.push(mainBranch('General'));
+            lines.push(subItem('CPU', `${cpuCount} × ${cpuModel} (${cores}C/${threads}T)`));
+            lines.push(lastSubItem('RAM', `${ramRaw} (${ram})`));
+
+            lines.push(mainBranch('Storage'));
+            if (diskGroups && Array.isArray(diskGroups) && diskGroups.length > 0) {
+                diskGroups.forEach((group, index) => {
+                    const desc = get(group, 'description', 'Unknown disk group');
+                    const groupId = get(group, 'diskGroupId', '#');
+                    const label = `Group ${groupId}`;
+                    const isLast = index === diskGroups.length - 1;
+                    
+                    lines.push(isLast ? lastSubItem(label, desc) : subItem(label, desc));
+                });
+            } else {
+                lines.push(lastSubItem('Disks', 'No disk groups found.'));
+            }
+            
+            lines.push(mainBranch('Misc'));
+            lines.push(subItem('Arch', get(config, 'processorArchitecture')));
+            lines.push(subItem('Boot Mode', get(config, 'bootMode')));
+            lines.push(subItem('Motherboard', get(config, 'motherboard')));
+            lines.push(lastSubItem('Form Factor', get(config, 'formFactor')));
+
+
+            lines.push(lastMainBranch('Extras & Add-ons'));
+            const expansionCards = get(config, 'expansionCards', null);
+            const usbKeys = get(config, 'usbKeys', null);
+            
+            const extras = [];
+            if (expansionCards) extras.push({ label: 'Exp. Cards', value: expansionCards });
+            if (usbKeys) extras.push({ label: 'USB Keys', value: usbKeys });
+
+            if (extras.length === 0) {
+                lines.push(`   └─ <span class="text-muted">(None)</span>`);
+            } else {
+                extras.forEach((extra, index) => {
+                    const isLast = index === extras.length - 1;
+                    lines.push(isLast ? finalLastSubItem(extra.label, extra.value) : finalSubItem(extra.label, extra.value));
+                });
+            }
+
+            return lines;
+        }
+        
+        async function processCommand(command) {
+            const parts = command.trim().split(' ');
+            const cmd = parts[0].toLowerCase();
+            const args = parts.slice(1);
+
+            if (command) {
+                commandHistory.push(command);
+                historyIndex = commandHistory.length;
+                saveCommandHistory(); 
+            }
+
+            switch (cmd) {
+                case 'check':
+                    if (args.length === 1) {
+                        await checkServerConfig(args[0]);
+                    } else {
+                        printToTerminal(`<span class="text-error">Usage: check &lt;server-name&gt;</span>`);
+                    }
+                    break;
+                case 'help':
+                    const helpLines = [
+                        `Available commands:`,
+                        `  <span class="text-info">check &lt;server-name&gt;</span> - Checks hardware specs for a server.`,
+                        `  <span class="text-info">config</span>           - Opens the API settings modal.`,
+                        `  <span class="text-info">clear</span>            - Clears the terminal screen.`,
+                        `  <span class="text-info">ls</span>               - List servers in history.`,
+                        `  <span class="text-info">rename &lt;server-name&gt; [friendly-name]</span> - Rename a server in history.`,
+                        `  <span class="text-info">delete &lt;server-name&gt;</span>  - Delete a server from history.`,
+                        `  <span class="text-info">clear-server-history</span> - Clears all checked server history.`,
+                        `  <span class="text-info">clear-cmd-history</span>  - Clears the command history.`,
+                        `  <span class="text-info">help</span>             - Shows this help message.`
+                    ];
+                    printLinesAnimated(helpLines, 10);
+                    break;
+                case 'clear':
+                    clearTerminal();
+                    break;
+                case 'config':
+                    openSettings();
+                    break;
+                case 'ls':
+                    if (serverHistory.length === 0) {
+                        printToTerminal(`<span class="text-muted">Server history is empty.</span>`);
+                        break;
+                    }
+                    
+                    printToTerminal(`Servers in history (${serverHistory.length}):`);
+                    const lines = [];
+                    serverHistory.forEach(item => {
+                        const serverName = item.id;
+                        const friendlyName = item.friendlyName ? `<span class="text-info">${item.friendlyName}</span>` : `<span class="text-muted">(none)</span>`;
+                        const description = get(item.config, 'description', 'N/A');
+                        const summary = item.summary; 
+
+                        lines.push(`- <span class="text-white font-medium">${serverName}</span>
+  ├─ <span class="text-info">Name:</span> ${friendlyName}
+  ├─ <span class="text-info">Desc:</span> <span class="text-muted">${description}</span>
+  └─ <span class="text-info">Spec:</span> <span class="text-muted">${summary}</span>`);
+                    });
+                    printLinesAnimated(lines, 20); 
+                    break;
+                case 'rename':
+                    if (args.length < 1) {
+                        printToTerminal(`<span class="text-error">Usage: rename &lt;server-name&gt; [friendly-name]</span>`);
+                    } else {
+                        const serverName = args[0];
+                        const friendlyName = args.slice(1).join(' ').trim(); 
+                        const server = serverHistory.find(s => s.id === serverName);
+                        if (!server) {
+                            printToTerminal(`<span class="text-error">Server not in history: ${serverName}</span>`);
+                        } else {
+                            if (friendlyName) {
+                                server.friendlyName = friendlyName;
+                                printToTerminal(`<span class="text-success">Renamed '${serverName}' to '${friendlyName}'.</span>`);
+                            } else {
+                                server.friendlyName = undefined; 
+                                printToTerminal(`<span class="text-success">Cleared friendly name for '${serverName}'.</span>`);
+                            }
+                            localStorage.setItem(SERVER_HISTORY_KEY, JSON.stringify(serverHistory));
+                            renderServerHistory();
+                        }
+                    }
+                    break;
+                case 'delete':
+                    if (args.length !== 1) {
+                        printToTerminal(`<span class="text-error">Usage: delete &lt;server-name&gt;</span>`);
+                    } else {
+                        deleteServerFromHistory(args[0], true); 
+                    }
+                    break;
+                case 'clear-server-history':
+                    clearServerHistory();
+                    break;
+                case 'clear-cmd-history':
+                    clearCommandHistory();
+                    break;
+                case '':
+                    break;
+                default:
+                    printToTerminal(`<span class="text-error">Command not found: ${cmd}</span>`);
+                    break;
+            }
+        }
+        
+        async function checkServerConfig(serverId) {
+            const config = getConfig();
+            if (!config || !config.appKey || !config.appSecret || !config.consumerKey) {
+                printToTerminal(`<span class="text-error">API settings are missing.</span>`);
+                openSettings();
+                return;
+            }
+
+            printToTerminal(`Checking specs for <span class="text-info">${serverId}</span>...`);
+
+            try {
+                const method = 'GET';
+                const baseUrl = ENDPOINT_URLS[config.endpoint];
+                const path = `/dedicated/server/${serverId}/specifications/hardware`;
+                const query = ''; 
+                const body = ''; 
+                const timestamp = Math.floor(Date.now() / 1000).toString();
+
+                const fullUrl = baseUrl + path;
+
+                const toSign = [
+                    config.appSecret,
+                    config.consumerKey,
+                    method,
+                    fullUrl,
+                    body,
+                    timestamp
+                ].join('+');
+
+                const signature = '$1$' + await sha1(toSign);
+
+                const response = await fetch(fullUrl, {
+                    method: method,
+                    headers: {
+                        'X-Ovh-Application': config.appKey,
+                        'X-Ovh-Consumer': config.consumerKey,
+                        'X-Ovh-Timestamp': timestamp,
+                        'X-Ovh-Signature': signature,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const reportLines = formatReport(data, false);
+                    printLinesAnimated(reportLines);
+                    addServerToHistory(serverId, data);
+                } else {
+                    let errorMsg = `Error: ${response.status} ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = `<span class="text-error">API Error: ${errorData.message || 'Unknown error'}</span>`;
+                    } catch (e) {
+                        errorMsg = `<span class="text-error">API Error: ${response.status} ${response.statusText}</span>`;
+                    }
+                    
+                    if (response.status === 401 || response.status === 403) {
+                         printToTerminal(`${errorMsg}\n<span class="text-warn">Authentication failed. Check your API credentials.</span>`);
+                         openSettings();
+                    } else if (response.status === 404) {
+                        printToTerminal(`<span class="text-error">Server not found: ${serverId}</span>`);
+                    } else {
+                        printToTerminal(errorMsg);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                printToTerminal(`<span class="text-error">Network or script error: ${error.message}</span>`);
+            }
+        }
+
+        terminalForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const command = terminalInput.value;
+            printToTerminal(`<span class="text-muted"><span class="text-error">$</span> ${command}</span>`);
+            processCommand(command);
+            terminalInput.value = '';
+        });
+
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                }
+                if (historyIndex >= 0 && commandHistory.length > 0 && historyIndex < commandHistory.length) {
+                    terminalInput.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    terminalInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    terminalInput.value = '';
+                }
+            }
+        });
+
+        configButton.addEventListener('click', openSettings);
+        
+        settingsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(settingsForm);
+            
+            const newLimit = parseInt(formData.get('cmd-history-limit'), 10);
+            if (newLimit && newLimit > 0) {
+                cmdHistoryLimit = newLimit;
+                localStorage.setItem(CMD_HISTORY_LIMIT_KEY, newLimit);
+                saveCommandHistory(); 
+            }
+
+            const config = {
+                endpoint: formData.get('endpoint'),
+                appKey: formData.get('app-key'),
+                appSecret: formData.get('app-secret'),
+                consumerKey: formData.get('consumer-key'),
+            };
+            saveConfig(config);
+            closeSettings();
+            printToTerminal(`<span class="text-success">Configuration saved.</span>`);
+        });
+
+        clearCmdHistoryBtn.addEventListener('click', clearCommandHistory);
+        clearServerHistoryBtn.addEventListener('click', clearServerHistory);
+        clearAllStorageBtn.addEventListener('click', clearAllStorage);
+
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                closeSettings();
+            }
+        });
+
+        async function init() {
+            clearTerminal();
+            
+            cmdHistoryLimit = parseInt(localStorage.getItem(CMD_HISTORY_LIMIT_KEY) || '50', 10);
+            commandHistory = JSON.parse(localStorage.getItem(CMD_HISTORY_KEY)) || [];
+            historyIndex = commandHistory.length;
+
+            serverHistory = JSON.parse(localStorage.getItem(SERVER_HISTORY_KEY)) || [];
+            renderServerHistory();
+
+            if (!getConfig()) {
+                printToTerminal(`<span class="text-warn">API settings not found.</span>`);
+                openSettings();
+            } else {
+                printToTerminal(`<span class="text-success">API settings loaded from storage.</span>`);
+                terminalInput.focus();
+            }
+			
+			printToTerminal(`Type <span class="text-info">'help'</span> for a list of commands.`);
+        }
+
+        init();
+    </script>
+</body>
+</html>
