@@ -17,7 +17,7 @@ A front-end only, in-browser terminal for checking OVH server hardware specifica
 1. **Get API Credentials:**  
    * Open the **Settings** (⚙️ icon).  
    * You will need to generate API keys from OVH. You can use this link: [https://api.ovh.com/createToken/](https://api.ovh.com/createToken/)  
-   * When creating your token, you need to grant GET access to the /dedicated/server/\* endpoints.  
+   * When creating your token, you need to grant GET access to the "/dedicated/server/\*/specifications/hardware" endpoints.
 2. **Enter Keys:** Copy the Application Key, Application Secret, and Consumer Key into the settings modal and save.  
 3. **Start Checking:** You can now use the check command\!
 
